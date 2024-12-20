@@ -6,61 +6,49 @@ import time
 import torch
 import torchvision
 
-import cv2
-import numpy as np
-
 class ort_v5:
     def __init__(self, img_path, onnx_model, backbone_onnx_model, conf_thres, iou_thres, img_size, classes, webcam=False):
         self.webcam = webcam
-        self.img_path= img_path
-        self.onnx_model=onnx_model
-        self.conf_thres=conf_thres
-        self.iou_thres =iou_thres
-        self.img_size=img_size
-        self.names= classes
-        self.net=None
-        self.ort_session=None
+        self.img_path = img_path
+        self.onnx_model = onnx_model
+        self.conf_thres = conf_thres
+        self.iou_thres = iou_thres
+        self.img_size = img_size
+        self.names = classes
+        self.net = None
+        self.ort_session = None
         self.backbone_onnx_model = backbone_onnx_model
 
     def __call__(self):
-        #image preprocessing
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if ort.get_device()=='GPU' else ['CPUExecutionProvider']
+        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if ort.get_device() == 'GPU' else ['CPUExecutionProvider']
         self.ort_session = ort.InferenceSession(self.onnx_model, providers=providers)
-
         self.net = ort.InferenceSession(self.backbone_onnx_model, providers=providers)
 
-        # self.net.eval()
         if self.webcam:
-          vid = cv2.VideoCapture(0)
-          cnt = 0
-          while True:
-            ret, frame = vid.read()
-            # print(frame.shape)
-            # cnt += 1
-            # if (cnt%20 != 0):
-            #     continue
-            t_1 = time.time()
-            output = self.detect_img(frame)
-            t_2 = time.time()
-            # print(t_2 - t_1)
-            cv2.imshow('Face Detection', output)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-          vid.release()
-          cv2.destroyAllWindows()         
+            vid = cv2.VideoCapture(0)
+            cnt = 0
+            while True:
+                ret, frame = vid.read()
+                t_1 = time.time()
+                output = self.detect_img(frame)
+                t_2 = time.time()
+                cv2.imshow('Face Detection', output)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+            vid.release()
+            cv2.destroyAllWindows()
         else:
-          image_or= cv2.imread(self.img_path)
-          self.detect_img(image_or)
+            image_or = cv2.imread(self.img_path)
+            self.detect_img(image_or)
 
     def detect_img(self, image_or):
-        
-        # print(image_or)
         image, ratio, dwdh = self.letterbox(image_or, auto=False)
         image = image.transpose((2, 0, 1))
         image = np.expand_dims(image, 0)
         image = np.ascontiguousarray(image)
         im = image.astype(np.float32)
         im /= 255
+        X_ortvalue = ort.OrtValue.ortvalue_from_numpy(im, 'cpu', 0)
         # print(im.shape)
 
         #onnxruntime session
@@ -72,14 +60,12 @@ class ort_v5:
         # print('before:', len(inp[inname[0]]))
         inp = np.array(inp[inname[0]], dtype=np.float32)
         
-
-
         # ONNXRuntime inference
         t1 = time.time()
         #X is numpy array on cpu
 
-        X_ortvalue = ort.OrtValue.ortvalue_from_numpy(inp, 'cuda', 0)
-        Y_ortvalue = ort.OrtValue.ortvalue_from_shape_and_type([1,25200,16], np.float32, 'cuda', 0)  # Change the shape to the actual shape of the output being bound
+        X_ortvalue = ort.OrtValue.ortvalue_from_numpy(inp, 'cpu', 0)
+        Y_ortvalue = ort.OrtValue.ortvalue_from_shape_and_type([1,25200,16], np.float32, 'cpu', 0)  # Change the shape to the actual shape of the output being bound
         io_binding = session.io_binding()
         io_binding.bind_input(name='input', device_type=X_ortvalue.device_name(), device_id=0, element_type=np.float32, shape=X_ortvalue.shape(), buffer_ptr=X_ortvalue.data_ptr())
         io_binding.bind_output(name='output', device_type=Y_ortvalue.device_name(), device_id=0, element_type=np.float32, shape=Y_ortvalue.shape(), buffer_ptr=Y_ortvalue.data_ptr())
@@ -344,14 +330,15 @@ class ort_v5:
         im = cv2.copyMakeBorder(im, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
         return im, r, (dw, dh)
 
-image = './/yolov5-face//data/images/test.jpg'
-# weights = './/yolov5-face//yolov5m-face.onnx'
-weights = './yolov5m-face.onnx'
-backbone = './backbone.onnx'
-conf = 0.7
-iou_thres = 0.5
-img_size = 640
-classes_txt = './/yolov5-face//classes.txt'
+if __name__ == "__main__":
+    image = './/yolov5-face//data/images/test.jpg'
+    # weights = './/yolov5-face//yolov5m-face.onnx'
+    weights = './yolov5m-face.onnx'
+    backbone = './backbone.onnx'
+    conf = 0.7
+    iou_thres = 0.5
+    img_size = 640
+    classes_txt = './/yolov5-face//classes.txt'
 
-ORT= ort_v5(image, weights, backbone, conf, iou_thres, (img_size, img_size), classes=classes_txt, webcam=True)
-ORT()
+    ORT = ort_v5(image, weights, backbone, conf, iou_thres, (img_size, img_size), classes=classes_txt, webcam=True)
+    ORT()

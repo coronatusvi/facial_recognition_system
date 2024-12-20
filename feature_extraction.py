@@ -32,11 +32,13 @@ if __name__ == "__main__":
     if check==False:
         os.mkdir('database_tensor')
     net = iresnet100(False)
-    net.load_state_dict(torch.load(args.weight))
+    # net.load_state_dict(torch.load(args.weight))
+    net.load_state_dict(torch.load(args.weight, map_location=torch.device('cpu'), weights_only=True))
     net.eval()
     path=args.path_database
     import os
     img=os.listdir(path)
     for im in img:
-        np.save('database_tensor/'+im.replace('.png','')+'.npy',inference(net, str(path)+'/'+im))
+        filename, _ = os.path.splitext(im)
+        np.save(f'database_tensor/{filename}.npy', inference(net, f'{path}/{im}'))
         print(im)
