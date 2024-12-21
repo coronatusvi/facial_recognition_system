@@ -1,5 +1,5 @@
-# facial_recognition_system
-# source ~/miniconda3/bin/activate
+#   facial_recognition_system
+#   source ~/miniconda3/bin/activate 
 
 # Environment Setup
 ```python 
@@ -28,3 +28,12 @@ Ensuring the right data tree format
 **database_image**: containing image for each profile
 
 **database_tensor**: containing vector feature extracted by pretrained backbone for each profile
+
+'''
+    python feature_extraction.py --weight 'weights/backbone.pth' --path_database database_image
+
+    python converttoonnx.py
+
+    python detection_gpu.py
+'''
+
